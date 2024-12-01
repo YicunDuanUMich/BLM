@@ -7,7 +7,7 @@ This repository contains the code implementation of ByteTrack and ByteTrack with
 <details>
 <summary>Installation</summary>
 
-**PyTorch with CUDA should be installed in your machine**
+(1) **PyTorch with CUDA should be installed in your machine**
 
 For Windows user and CUDA 11.X,
 
@@ -15,13 +15,13 @@ For Windows user and CUDA 11.X,
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
-**Install other requirements**
+(2) **Install other requirements**
 
 ```shell
 pip3 install -r requirements.txt
 ```
 
-**Install pycocotools**
+(3) **Install pycocotools**
 * For Ubuntu use:
 ```shell
 pip3 install cython; pip3 install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
@@ -33,7 +33,7 @@ pip3 install "git+https://github.com/philferriere/cocoapi.git#egg=pycocotools&su
 ```
 
 
-**Install YOLOX**
+(4) **Install YOLOX**
 
 Clone YOLOX github repository and run setup
 ```shell
@@ -44,7 +44,7 @@ cd ..
 ```
 
 
-**Install FastReID**
+(5) **Install FastReID**
 
 Clone FastReID github repository
 ```shell

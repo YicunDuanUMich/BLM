@@ -13,3 +13,4 @@ motmetrics
 filterpy
 h5py
 norfair
+PyQt6

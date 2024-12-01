@@ -2,11 +2,7 @@
 
 Umich ID: 62178151; Email: pduan@umich.edu
 
-This repository contains the code implementation of ByteTrack and ByteTrack with Level Matching.
-
-Due to the submission file size limit, this repository only contains the code.
-
-If you have any question about how to run this project, please feel free to contact me.
+This repository contains the code implementation of ByteTrack and ByteTrack with Level Matching. Due to the submission file size limit, this repository only contains the code. If you have any question about how to run this project, please feel free to contact me.
 
 <details>
 <summary>Installation</summary>
@@ -71,13 +67,6 @@ setup(name='fastreid', version='1.3', packages=find_packages(exclude=("tests", "
 Run setup
 ```shell
 pip install -e .
-```
-
-
-**Install PyQt6**
-
-```shell
-pip install PyQt6
 ```
 
 </details>

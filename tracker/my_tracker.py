@@ -2,9 +2,9 @@ import numpy as np
 
 from .kalman_filter import KalmanFilter
 from . import matching
-from .track import BaseTrack, TrackState
+from .track import TrackState
 from .reid_estimator import FastReIDEstimator
-from .track import EnhancedTrack
+from .track import EnhancedTrack, joint_stracks, sub_stracks, remove_duplicate_stracks
 
 
 class MyTracker(object):
@@ -12,17 +12,23 @@ class MyTracker(object):
     This is a tracker based on ByteTrack.
     """
 
-    def __init__(self, args, frame_rate=30, use_reid=False, use_level=False, use_optical_flow=False):
+    def __init__(self,
+                 args,
+                 frame_rate=30,
+                 use_reid=False,
+                 use_level=False,
+                 use_optical_flow=False,
+                 only_pedestrian=True):
         self.tracked_stracks = []  # type: list[EnhancedTrack]
         self.lost_stracks = []  # type: list[EnhancedTrack]
         self.removed_stracks = []  # type: list[EnhancedTrack]
-        BaseTrack.clear_count()
 
         self.frame_id = 0
 
         self.use_reid = use_reid
         self.use_level = use_level
         self.use_optical_flow = use_optical_flow
+        self.only_pedestrian = only_pedestrian
 
         assert not (self.use_level and not self.use_reid), \
             "if you set use_level to True, you should also set use_reid to True"
@@ -35,12 +41,14 @@ class MyTracker(object):
             self.reid_estimator = FastReIDEstimator(config_file="fast-reid/configs/MOT17/sbs_S50.yml",
                                                     weights_path="assets/weights/mot17_sbs_S50.pth",
                                                     device="cuda")
+        else:
+            self.reid_estimator = None
 
         if self.use_level:
-            self.detection_thresh_levels = [(0.0, 0.1), (0.1, 0.5), (0.5, 0.7), (0.7, 0.8), (0.8, 1.0)]
+            self.detection_thresh_levels = [(0.0, 0.1), (0.1, 0.5), (0.5, 0.7), (0.7, 0.8), (0.8, np.inf)]
             self.reid_factors = [0.85, 0.95, 0.98]
         else:
-            self.detection_thresh_levels = [(0.0, 0.1), (0.1, 0.5), (0.5, 1.0)]
+            self.detection_thresh_levels = [(0.0, 0.1), (0.1, 0.5), (0.5, np.inf)]
             self.reid_factors = [0.98]
 
     def _estimate_dists(self, tracks, detections, use_reid, reid_factor):
@@ -73,12 +81,14 @@ class MyTracker(object):
         unconfirmed_stracks = []  # type: list[EnhancedTrack]
         confirmed_stracks = []  # type: list[EnhancedTrack]
 
+        if detector_outputs.shape[1] != 5:
+            detector_outputs = detector_outputs.cpu().numpy()
+
         # Find pedestrians
-        if len(detector_outputs) > 0:
+        if self.only_pedestrian and len(detector_outputs) > 0:
             if detector_outputs.shape[1] == 5:
                 detector_outputs = detector_outputs[detector_outputs[:, -1].astype(int) == 0]
             else:
-                detector_outputs = detector_outputs.cpu().numpy()
                 detector_outputs = detector_outputs[detector_outputs[:, -1].astype(int) == 0]
 
         if len(detector_outputs) > 0:
@@ -96,10 +106,7 @@ class MyTracker(object):
             bboxes /= scale
 
             detection_levels = []
-            for level_idx, detection_thresh_values in enumerate(self.detection_thresh_levels):
-                if level_idx == 0:
-                    continue
-
+            for detection_thresh_values in self.detection_thresh_levels[1:]:
                 lower_bound = detection_thresh_values[0]
                 higher_bound = detection_thresh_values[1]
                 not_high_items = (scores <= higher_bound)
@@ -122,7 +129,7 @@ class MyTracker(object):
                 detection_levels.append(inter_detections)
 
             detection_levels.reverse()
-            self.reid_factors.reverse()
+            reid_factors = self.reid_factors[::-1]
 
             ''' Add newly detected tracklets to unconfirmed_stracks'''
             for track in self.tracked_stracks:
@@ -139,14 +146,15 @@ class MyTracker(object):
             high_u_detections = []
             for level_idx, detections in enumerate(detection_levels[:-1]):
                 dists = self._estimate_dists(confirmed_unmatched_stracks, detections,
-                                             use_reid=self.use_reid, reid_factor=self.reid_factors[level_idx])
+                                             use_reid=self.use_reid, reid_factor=reid_factors[level_idx])
                 matches_idx, u_track_idx, u_detection_idx = matching.linear_assignment(dists, thresh=0.8)
 
                 for track_idx, det_idx in matches_idx:
                     track = confirmed_unmatched_stracks[track_idx]
                     det = detections[det_idx]
                     if track.state == TrackState.Tracked:
-                        track.update(det, self.frame_id, frame=img_info["raw_img"] if self.use_optical_flow else None)
+                        track.update(det, self.frame_id,
+                                     frame=img_info["raw_img"] if self.use_optical_flow else None)
                         activated_starcks.append(track)
                     else:
                         track.re_activate(det, self.frame_id, new_id=False,
@@ -168,20 +176,18 @@ class MyTracker(object):
             for track_idx, det_idx in matches_idx:
                 track = remaining_confirmed_unmatched_tracked_stracks[track_idx]
                 det = detection_levels[-1][det_idx]
-                # if track.state == TrackState.Tracked:
-                track.update(det, self.frame_id, frame=img_info["raw_img"] if self.use_optical_flow else None)
-                activated_starcks.append(track)
-                # else:
-                #     track.re_activate(det, self.frame_id, new_id=False)
-                #     refind_stracks.append(track)
+                if track.state == TrackState.Tracked:
+                    track.update(det, self.frame_id, frame=img_info["raw_img"] if self.use_optical_flow else None)
+                    activated_starcks.append(track)
+                else:
+                    track.re_activate(det, self.frame_id, new_id=False)
+                    refind_stracks.append(track)
 
             for track_idx in u_track_idx:
                 track = remaining_confirmed_unmatched_tracked_stracks[track_idx]
-                # if not track.state == TrackState.Lost:
-                track.mark_lost()
-                lost_stracks.append(track)
-                # else:
-                #     print("WARNING")
+                if not track.state == TrackState.Lost:
+                    track.mark_lost()
+                    lost_stracks.append(track)
 
             ''' Deal with unconfirmed tracks, usually tracks with only one beginning frame'''
             dists = self._estimate_dists(unconfirmed_stracks, high_u_detections, use_reid=False, reid_factor=0.0)
@@ -233,44 +239,3 @@ class MyTracker(object):
         self.tracked_stracks, self.lost_stracks = remove_duplicate_stracks(self.tracked_stracks, self.lost_stracks)
 
         return [track for track in self.tracked_stracks if track.is_activated]
-
-
-def joint_stracks(tlista, tlistb):
-    exists = {}
-    res = []
-    for t in tlista:
-        exists[t.track_id] = 1
-        res.append(t)
-    for t in tlistb:
-        tid = t.track_id
-        if not exists.get(tid, 0):
-            exists[tid] = 1
-            res.append(t)
-    return res
-
-
-def sub_stracks(tlista, tlistb):
-    stracks = {}
-    for t in tlista:
-        stracks[t.track_id] = t
-    for t in tlistb:
-        tid = t.track_id
-        if stracks.get(tid, 0):
-            del stracks[tid]
-    return list(stracks.values())
-
-
-def remove_duplicate_stracks(stracksa, stracksb):
-    pdist = matching.iou_distance(stracksa, stracksb)
-    pairs = np.where(pdist < 0.15)
-    dupa, dupb = list(), list()
-    for p, q in zip(*pairs):
-        timep = stracksa[p].frame_id - stracksa[p].start_frame
-        timeq = stracksb[q].frame_id - stracksb[q].start_frame
-        if timep > timeq:
-            dupb.append(q)
-        else:
-            dupa.append(p)
-    resa = [t for i, t in enumerate(stracksa) if not i in dupa]
-    resb = [t for i, t in enumerate(stracksb) if not i in dupb]
-    return resa, resb

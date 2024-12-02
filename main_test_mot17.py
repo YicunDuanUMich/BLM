@@ -4,7 +4,7 @@ import os.path
 
 from tracker.my_tracker import MyTracker
 from tracker.ori_tracker import BYTETracker
-from norfair import metrics, drawing, video
+from norfair import metrics, video
 
 parser = argparse.ArgumentParser("STATS 507 Final Project")
 
@@ -13,12 +13,6 @@ parser.add_argument(
     type=str,
     nargs="?",
     help="path to the MOT Challenge train dataset folder (test dataset doesn't provide labels)",
-)
-parser.add_argument(
-    "--make-video",
-    dest="make_video",
-    action="store_true",
-    help="generate an output video, using the frames provided by the MOTChallenge dataset.",
 )
 parser.add_argument(
     "--save-pred",
@@ -37,7 +31,7 @@ parser.add_argument(
     dest="output_path",
     type=str,
     nargs="?",
-    default=".",
+    default="./outputs",
     help="output path",
 )
 parser.add_argument(
@@ -54,6 +48,18 @@ parser.add_argument(
     action="store_true",
     help="whether to use my tracker.",
 )
+parser.add_argument(
+    "--use-reid",
+    dest="use_reid",
+    action="store_true",
+    help="whether to enable the reid for my tracker.",
+)
+parser.add_argument(
+    "--use-level-match",
+    dest="use_level_match",
+    action="store_true",
+    help="whether to enable the level match for my tracker.",
+)
 
 # MyTrack arguments
 parser.add_argument("--track_buffer", type=int, default=30, help="the frames for keep lost tracks")
@@ -68,15 +74,17 @@ args = parser.parse_args()
 output_path = args.output_path
 
 if args.save_metrics:
-    print("Saving metrics file at " + os.path.join(output_path, "metrics.txt"))
+    print("Saving metrics file at " + output_path)
 if args.save_pred:
-    print("Saving predictions files at " + os.path.join(output_path, "predictions/"))
-if args.make_video:
-    print("Saving videos at " + os.path.join(output_path, "videos/"))
+    print("Saving predictions files at " + output_path)
 if args.use_my_tracker:
     print("Using my tracker")
 else:
     print("Using original ByteTrack")
+if args.use_reid:
+    print("Using ReID")
+if args.use_level_match:
+    print("Using Level Match")
 
 
 class PartialStaticTracker:
@@ -113,21 +121,23 @@ if __name__ == '__main__':
             input_path=input_path, information_file=info_file
         )
 
+        video_file = video.VideoFromFrames(
+            input_path=input_path, save_path=output_path, information_file=info_file,
+            make_video=False
+        )
+
         if args.save_pred:
             predictions_text_file = metrics.PredictionsTextFile(
                 input_path=input_path, save_path=output_path, information_file=info_file
             )
 
-        if args.make_video:
-            video_file = video.VideoFromFrames(
-                input_path=input_path, save_path=output_path, information_file=info_file
-            )
         if args.use_my_tracker:
             tracker = MyTracker(args,
                                 frame_rate=info_file.search("frameRate"),
-                                use_reid=False,
-                                use_level=False,
-                                use_optical_flow=False)
+                                use_reid=args.use_reid,
+                                use_level=args.use_level_match,
+                                use_optical_flow=False,
+                                only_pedestrian=False)
         else:
             args_byte = ArgsByte(track_thresh=0.5, track_buffer=30, match_thresh=0.8)
             tracker = BYTETracker(args_byte, info_file.search("frameRate"))
@@ -143,6 +153,7 @@ if __name__ == '__main__':
         byte_tracked_objects = []
         for frame_number, detections in enumerate(all_detections):
             byte_detections = []
+            img_info["raw_img"] = next(video_file)
             for det in detections:
                 byte_det = np.append(det.points.reshape((1, -1)), det.scores[0])
                 byte_detections.append(byte_det)
@@ -164,13 +175,6 @@ if __name__ == '__main__':
                     PartialStaticTracker(box, obj.track_id, np.array([True]))
                 )
 
-            # Draw detection and tracked object boxes on frame
-            if args.make_video:
-                frame = next(video_file)
-                frame = drawing.draw_boxes(frame, detections=detections)
-                frame = drawing.draw_tracked_boxes(frame=frame, objects=tracked_objects)
-                video_file.update(frame=frame)
-
             # Update output text file
             if args.save_pred:
                 predictions_text_file.update(predictions=tracked_objects)
@@ -181,4 +185,13 @@ if __name__ == '__main__':
     accumulator.print_metrics()
 
     if args.save_metrics:
-        accumulator.save_metrics(save_path=output_path)
+        if args.use_my_tracker:
+            metrics_folder = "metrics_my_tracker"
+            if args.use_reid:
+                metrics_folder += "_reid"
+            if args.use_level_match:
+                metrics_folder += "_level_match"
+        else:
+            metrics_folder = "metrics_bytetrack"
+
+        accumulator.save_metrics(save_path=os.path.join(output_path, metrics_folder))

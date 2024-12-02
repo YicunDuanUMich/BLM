@@ -140,5 +140,5 @@ class FastReIDEstimator:
 
 if __name__ == "__main__":
     reid_generator = FastReIDEstimator(config_file="../fast-reid/configs/MOT17/sbs_S50.yml",
-                                       weights_path="../weights/mot17_sbs_S50.pth",
+                                       weights_path="../assets/weights/mot17_sbs_S50.pth",
                                        device="cuda")

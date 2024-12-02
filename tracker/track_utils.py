@@ -165,7 +165,6 @@ def lucas_kanade(old_frame, new_frame, feature_list, window_size=3):
             return u, v
 
 
-# copy from lab, just for testing
 def horn_schunk(old_frame, new_frame):
     iterations = 10
     lam = 0.001

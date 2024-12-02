@@ -49,8 +49,7 @@ if __name__ == '__main__':
         os.makedirs(os.path.join(".", "outputs"))
 
     video_reader = VideoReader(video_input_path)
-    if video_reader.video_cap is None:
-        exit(-1)
+    assert video_reader.video_cap is not None
 
     video_writer = cv2.VideoWriter(video_output_path, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
                                    video_reader.fps,

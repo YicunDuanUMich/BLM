@@ -89,13 +89,15 @@ OUTPUT_DIR: logs/MOT17/sbs_S50
 <details>
 <summary>How to run</summary>
 
+Please first download the MOT17 dataset and pre-trained model. Place your MOT17 dataset under folder `./assets`. Download pre-trained weights for FastReID from [this link](https://umich-my.sharepoint.com/:u:/g/personal/pduan_umich_edu/EfZUy6S0HpNAqXn0mmTeNN0Bu0OstRjb81nBGg3Q23BOLg?e=sLQXAq) and YOLOX from [this link](https://umich-my.sharepoint.com/:u:/g/personal/pduan_umich_edu/ET3wopjD3sNMhBigNW1p-HoB-wqLua6GQvVbLYug0QE85Q?e=fh2Txa). Copy them to the folder `./assets/weights`. 
+
 If you want to use the UI, please enter:
 
 ```shell
 python ui_main.py
 ```
 
-If you want to reproduce the experiment results, please first download the MOT17 dataset and pre-trained model. Place your MOT17 dataset under folder `./assets`. Download pre-trained weights for FastReID from [this link](https://umich-my.sharepoint.com/:u:/g/personal/pduan_umich_edu/EfZUy6S0HpNAqXn0mmTeNN0Bu0OstRjb81nBGg3Q23BOLg?e=sLQXAq) and YOLOX from [this link](https://umich-my.sharepoint.com/:u:/g/personal/pduan_umich_edu/ET3wopjD3sNMhBigNW1p-HoB-wqLua6GQvVbLYug0QE85Q?e=fh2Txa). Copy them to the folder `./assets/weights`. 
+If you want to reproduce the experiment results, 
 
 For ByteTrack:
 ```shell
